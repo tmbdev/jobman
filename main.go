@@ -31,13 +31,21 @@ func LinewiseOutput(prefix string) io.Writer {
 	reader, writer := io.Pipe()
 	buffered_reader := bufio.NewReader(reader)
 	go func() {
+		lines := []string{}
+		last := time.Now()
 		for {
 			line, err := buffered_reader.ReadString('\n')
 			if err != nil {
 				break
 			}
-			fmt.Printf("[%s] %s", prefix, line)
+			lines = append(lines, line)
+			if lines.Len() > 10 || line == "" || time.Now() - last > 3.0 {
+				fmt.Println(prefix, strings.Join(lines, ""))
+				lines = []string{}
+				last = time.Now()
+			}
 		}
+		fmt.Printf("[%s] %s", prefix, line)
 	} ()
 	return writer
 }
