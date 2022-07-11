@@ -109,7 +109,7 @@ func Runner(name string, cmd string, queue *fifo.Queue) {
 		fmt.Printf("# starting: %s :: %s\n", ident, actual)
 		cmd := exec.Command("/bin/sh", "-c", actual)
 		if options.LogDir != "" {
-			logfile := fmt.Sprintf("%s/%s.log", options.LogDir, ident)
+			logfile := fmt.Sprintf("%s/%s_%010d.log", options.LogDir, ident, time.Now().Unix())
 			stream, err := os.Create(logfile)
 			if err != nil {
 				fmt.Printf("# failed to create log file: %s\n", logfile)
