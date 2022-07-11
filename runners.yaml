@@ -1,0 +1,5 @@
+runners:
+  - echo 1 -- {cmd}
+  - echo 2 -- {cmd}
+  - echo 3 -- {cmd}
+  - echo 4 -- {cmd}
