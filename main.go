@@ -17,6 +17,8 @@ import (
 var options struct {
 	Verbose bool `short:"v" long:"verbose" description:"Verbose output"`
 	Wait int `short:"w" long:"wait" description:"Wait time"`
+	Jobs string `short:"j" long:"jobs" description:"Jobs file" default:"jobs.yaml"`
+	Runners string `short:"r" long:"runners" description:"Runners file (default: env JOBMAN_RUNNERS or runners.yaml)" default:""`
 }
 
 var Parser = flags.NewParser(&options, flags.Default)
@@ -54,12 +56,24 @@ func ReadYaml(file string) (map[interface{}]interface{}, error) {
 }
 
 func main() {
-	yjobs, err := ReadYaml("jobs.yaml")
+	if _, err := Parser.Parse(); err != nil {
+		os.Exit(1)
+	}
+
+	if options.Runners == "" {
+		options.Runners = os.Getenv("JOBMAN_RUNNERS")
+		if options.Runners == "" {
+			options.Runners = "runners.yaml"
+		}
+	}
+
+	yjobs, err := ReadYaml(options.Jobs)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	yrunners, err := ReadYaml("runners.yaml")
+
+	yrunners, err := ReadYaml(options.Runners)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
