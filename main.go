@@ -2,6 +2,7 @@ package main
 
 import (
 	"io"
+	"errors"
 	"bufio"
 	"os"
 	"fmt"
@@ -20,6 +21,8 @@ var options struct {
 	Verbose bool `short:"v" long:"verbose" description:"Verbose output"`
 	Wait int `short:"w" long:"wait" description:"Wait time"`
 	Runners string `short:"r" long:"runners" description:"Runners file (default: env JOBMAN_RUNNERS or runners.yaml)" default:""`
+	LineBuffer int `short:"l" long:"line-buffer" description:"Line buffer size." default:"1"`
+	LineTimeout float32 `short:"t" long:"line-timeout" description:"Line timeout." default:"1"`
 	Args struct {
 		Jobs string `description:"Jobs file"`
 	} `positional-args:"yes" required:"yes"`
@@ -27,27 +30,67 @@ var options struct {
 
 var Parser = flags.NewParser(&options, flags.Default)
 
-func LinewiseOutput(prefix string) io.Writer {
+var TIMEOUT = errors.New("timeout")
+
+func ReadLineWithTimeout(r *bufio.Reader, timeout time.Duration) (string, error) {
+	line, err := r.ReadString('\n')
+	return line, err
+	// FIXME
+	// t := time.NewTimer(timeout)
+	// defer t.Stop()
+	// for {
+	// 	select {
+	// 	case <-t.C:
+	// 		fmt.Println("timeout")
+	// 		return "", TIMEOUT
+	// 	default:
+	// 		line, err := r.ReadString('\n')
+	// 		if err == io.EOF {
+	// 			return line, io.EOF
+	// 		}
+	// 		if err != nil {
+	// 			return "", err
+	// 		}
+	// 		return line, nil
+	// 	}
+	// }
+}
+
+func LinewiseOutput(prefix string, eofnotify bool) *io.PipeWriter {
+	prefix = "[" + prefix + "] "
 	reader, writer := io.Pipe()
 	buffered_reader := bufio.NewReader(reader)
 	go func() {
 		lines := []string{}
 		last := time.Now()
 		for {
-			line, err := buffered_reader.ReadString('\n')
-			if err != nil {
-				break
-			}
-			lines = append(lines, line)
-			if lines.Len() > 10 || line == "" || time.Now() - last > 3.0 {
-				fmt.Println(prefix, strings.Join(lines, ""))
-				lines = []string{}
+			line, err := ReadLineWithTimeout(buffered_reader, 1 * time.Second)
+			if err != TIMEOUT {
+				if err != nil {
+					break
+				}
+				lines = append(lines, line)
 				last = time.Now()
 			}
+			// fmt.Println("<", time.Since(last), ">")
+			if len(lines) >= options.LineBuffer || line == "\n" || time.Since(last) > time.Second {
+				fmt.Print(prefix, strings.Join(lines, prefix))
+				lines = []string{}
+			}
 		}
-		fmt.Printf("[%s] %s", prefix, line)
+		if len(lines) > 0 {
+			fmt.Print(prefix, strings.Join(lines, prefix))
+		}
+		if eofnotify {
+			fmt.Println(prefix, "---")
+		}
 	} ()
 	return writer
+}
+
+type jobdesc struct {
+	name string
+	command string
 }
 
 func Runner(name string, cmd string, queue *fifo.Queue) {
@@ -59,13 +102,18 @@ func Runner(name string, cmd string, queue *fifo.Queue) {
 		if item == nil {
 			break
 		}
-		actual := strings.Replace(cmd, "{cmd}", item.(string), -1)
-		fmt.Println("[", name, "]", actual)
+		job := item.(jobdesc)
+		actual := strings.Replace(cmd, "{cmd}", job.command, -1)
+		fmt.Printf("# starting: %s@%s :: %s\n", job.name, name, actual)
 		cmd := exec.Command("/bin/sh", "-c", actual)
-		cmd.Stdout = LinewiseOutput(name)
-		cmd.Stderr = LinewiseOutput(name+"_err")
+		stdout := LinewiseOutput(name, true)
+		stderr:= LinewiseOutput(name+"_err", false)
+		cmd.Stdout = stdout
+		cmd.Stderr = stderr
 		cmd.Run()
 		time.Sleep(1 * time.Second)
+		stdout.Close()
+		stderr.Close()
 	}
 }
 
@@ -108,25 +156,43 @@ func main() {
 
 	queue := fifo.NewQueue()
 
-	jobs := yjobs["jobs"].([]interface{})
-	for k, v := range jobs {
-		if options.Verbose {
-			fmt.Printf("adding: %d: %s\n", k, v.(string))
+	switch jobs := yjobs["jobs"].(type) {
+	case []interface{}:
+		for k, v := range jobs {
+			job := jobdesc{name: strconv.Itoa(k), command: v.(string)}
+			queue.Add(job)
 		}
-		queue.Add(v)
+	case map[string]interface{}:
+		for k, v := range jobs {
+			job := jobdesc{name: k, command: v.(string)}
+			queue.Add(job)
+		}
+	default:
+		fmt.Println("jobs is not a list or map")
+		os.Exit(1)
 	}
 
-	runners := yrunners["runners"].([]interface{})
 	wg := sync.WaitGroup{}
-	for k, v := range runners {
-		if options.Verbose {
-			fmt.Printf("adding: %d: %s\n", k, v.(string))
+	switch runners := yrunners["runners"].(type) {
+	case []interface{}:
+		for k, v := range runners {
+			wg.Add(1)
+			go func(k int, v string) {
+				Runner(strconv.Itoa(k), v, queue)
+				wg.Done()
+			} (k, v.(string))
 		}
-		wg.Add(1)
-		go func(k int, v string) {
-			Runner(strconv.Itoa(k), v, queue)
-			wg.Done()
-		} (k, v.(string))
+	case map[string]interface{}:
+		for k, v := range runners {
+			wg.Add(1)
+			go func(k string, v string) {
+				Runner(k, v, queue)
+				wg.Done()
+			} (k, v.(string))
+		}
+	default:
+		fmt.Println("runners is not a list or map")
+		os.Exit(1)
 	}
 	wg.Wait()
 	fmt.Println("done")

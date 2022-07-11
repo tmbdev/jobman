@@ -1,11 +1,9 @@
 jobs:
-  - podman xyz 1
-  - podman xyz 2
-  - podman xyz 3
-  - podman xyz 4
-  - podman xyz 5
-  - podman xyz 6
-  - podman xyz 7
-  - podman xyz 8
-  - podman xyz 9
-  - podman xyz 10
+  - for i in {1..10}; do echo job=$$ result=$i; echo job=$$ more=$i; sleep 3; done
+  - for i in {1..10}; do echo job=$$ result=$i; echo job=$$ more=$i; sleep 3; done
+  - for i in {1..10}; do echo job=$$ result=$i; echo job=$$ more=$i; sleep 3; done
+  - for i in {1..10}; do echo job=$$ result=$i; echo job=$$ more=$i; sleep 3; done
+  - for i in {1..10}; do echo job=$$ result=$i; echo job=$$ more=$i; sleep 3; done
+  - for i in {1..10}; do echo job=$$ result=$i; echo job=$$ more=$i; sleep 3; done
+  - for i in {1..10}; do echo job=$$ result=$i; echo job=$$ more=$i; sleep 3; done
+  - for i in {1..10}; do echo job=$$ result=$i; echo job=$$ more=$i; sleep 3; done
