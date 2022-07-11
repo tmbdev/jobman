@@ -23,6 +23,7 @@ var options struct {
 	Runners string `short:"r" long:"runners" description:"Runners file (default: env JOBMAN_RUNNERS or runners.yaml)" default:""`
 	LineBuffer int `short:"l" long:"line-buffer" description:"Line buffer size." default:"1"`
 	LineTimeout float32 `short:"t" long:"line-timeout" description:"Line timeout." default:"1"`
+	LogDir string `short:"o" long:"log-dir" description:"Log directory." default:""`
 	Args struct {
 		Jobs string `description:"Jobs file"`
 	} `positional-args:"yes" required:"yes"`
@@ -104,16 +105,26 @@ func Runner(name string, cmd string, queue *fifo.Queue) {
 		}
 		job := item.(jobdesc)
 		actual := strings.Replace(cmd, "{cmd}", job.command, -1)
-		fmt.Printf("# starting: %s@%s :: %s\n", job.name, name, actual)
+		ident := fmt.Sprintf("%s@%s", job.name, name)
+		fmt.Printf("# starting: %s :: %s\n", ident, actual)
 		cmd := exec.Command("/bin/sh", "-c", actual)
-		stdout := LinewiseOutput(name, true)
-		stderr:= LinewiseOutput(name+"_err", false)
-		cmd.Stdout = stdout
-		cmd.Stderr = stderr
+		if options.LogDir != "" {
+			logfile := fmt.Sprintf("%s/%s.log", options.LogDir, ident)
+			stream, err := os.Create(logfile)
+			if err != nil {
+				fmt.Printf("# failed to create log file: %s\n", logfile)
+			}
+			defer stream.Close()
+			cmd.Stdout = stream 
+			cmd.Stderr = stream
+		} else {
+			stream := LinewiseOutput(ident, true)
+			defer stream.Close()
+			cmd.Stdout = stream 
+			cmd.Stderr = stream
+		}
 		cmd.Run()
 		time.Sleep(1 * time.Second)
-		stdout.Close()
-		stderr.Close()
 	}
 }
 
@@ -133,6 +144,13 @@ func ReadYaml(file string) (map[interface{}]interface{}, error) {
 func main() {
 	if _, err := Parser.Parse(); err != nil {
 		os.Exit(1)
+	}
+
+	if options.LogDir != "" {
+		err := os.MkdirAll(options.LogDir, 0755)
+		if err != nil {
+			fmt.Printf("# failed to create log directory: %s\n", options.LogDir)
+		}
 	}
 
 	if options.Runners == "" {
