@@ -1,6 +1,8 @@
 package main
 
 import (
+	"io"
+	"bufio"
 	"os"
 	"fmt"
 	"time"
@@ -17,11 +19,28 @@ import (
 var options struct {
 	Verbose bool `short:"v" long:"verbose" description:"Verbose output"`
 	Wait int `short:"w" long:"wait" description:"Wait time"`
-	Jobs string `short:"j" long:"jobs" description:"Jobs file" default:"jobs.yaml"`
 	Runners string `short:"r" long:"runners" description:"Runners file (default: env JOBMAN_RUNNERS or runners.yaml)" default:""`
+	Args struct {
+		Jobs string `description:"Jobs file"`
+	} `positional-args:"yes" required:"yes"`
 }
 
 var Parser = flags.NewParser(&options, flags.Default)
+
+func LinewiseOutput(prefix string) io.Writer {
+	reader, writer := io.Pipe()
+	buffered_reader := bufio.NewReader(reader)
+	go func() {
+		for {
+			line, err := buffered_reader.ReadString('\n')
+			if err != nil {
+				break
+			}
+			fmt.Printf("[%s] %s", prefix, line)
+		}
+	} ()
+	return writer
+}
 
 func Runner(name string, cmd string, queue *fifo.Queue) {
 	if options.Verbose {
@@ -35,8 +54,8 @@ func Runner(name string, cmd string, queue *fifo.Queue) {
 		actual := strings.Replace(cmd, "{cmd}", item.(string), -1)
 		fmt.Println("[", name, "]", actual)
 		cmd := exec.Command("/bin/sh", "-c", actual)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
+		cmd.Stdout = LinewiseOutput(name)
+		cmd.Stderr = LinewiseOutput(name+"_err")
 		cmd.Run()
 		time.Sleep(1 * time.Second)
 	}
@@ -67,7 +86,7 @@ func main() {
 		}
 	}
 
-	yjobs, err := ReadYaml(options.Jobs)
+	yjobs, err := ReadYaml(options.Args.Jobs)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
