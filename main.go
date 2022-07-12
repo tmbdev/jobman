@@ -246,6 +246,8 @@ func main() {
 
 	queue := fifo.NewQueue()
 
+	jobs_pre := ""
+
 	if options.Jobs != "" {
 		yjobs, err := ReadYaml(options.Jobs)
 		if err != nil {
@@ -254,7 +256,7 @@ func main() {
 		}
 
 		if pre, found := yjobs["pre"]; found {
-			Execute(pre.(string))
+			jobs_pre = pre.(string)
 		}
 
 		if logdir, found := yjobs["logdir"]; found && options.LogDir == "" {
@@ -262,12 +264,13 @@ func main() {
 		}
 
 		if template, found := yjobs["template"]; found {
-			if options.Template != "" {
-				panic("cannot specify both --template and jobs.yaml")
-			}
 			template := AsMap(template)
-			options.Template = template["command"].(string)
-			options.Range = AsString(template["range"])
+			if options.Template == "" {
+				options.Template = template["command"].(string)
+			}
+			if options.Range == "" {
+				options.Range = AsString(template["range"])
+			}
 		}
 
 		if jobs, found := yjobs["jobs"]; found {
@@ -302,6 +305,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	if jobs_pre != "" {
+		Execute(jobs_pre)
+	}
 
 	wg := sync.WaitGroup{}
 	if oninput, found := yrunners["oninput"]; found {
