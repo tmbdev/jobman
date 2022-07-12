@@ -69,8 +69,7 @@ with seed 0..99:
 $ jobman -T 'python3 train.py --seed={i}' -R 100 -o logs
 ```
 
-
-Usage:
+# Usage
 
 ```
 Usage:
@@ -91,6 +90,11 @@ Help Options:
   -h, --help          Show this help message
 ```
 
+# Other
+
+- multitail -q is useful for watching the log directory
+
+
 # TODO
 
 - override some command line options from jobs file
@@ -100,4 +104,6 @@ Help Options:
 - allow templating and multiline scripts inside jobs
 - command on stdin
 - jsonrun
-- job specs -- input, output, commandline, time limit, resource limit
+- job specs -- input, output, commandline, time limit, resource limit (structure and YAML)
+- one-per-runner jobs (for testing, preparing at startup)
+- matching job tags with runner tags (for resource requirements), e.g. #BIG
