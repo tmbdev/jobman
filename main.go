@@ -140,6 +140,17 @@ func Runner(name string, cmd []string, queue *fifo.Queue) {
 	}
 }
 
+func AsString(v interface{}) string {
+	switch v.(type) {
+	case string:
+		return v.(string)
+	case int:
+		return strconv.Itoa(v.(int))
+	default:
+		panic(fmt.Sprintf("unsupported type: %T", v))
+	}
+}
+
 func AsCommand(args interface{}) []string {
 	switch args := args.(type) {
 	case string:
@@ -238,11 +249,21 @@ func main() {
 			Execute(pre.(string))
 		}
 
-		jobs := AsMap(yjobs["jobs"])
+		if template, found := yjobs["template"]; found {
+			if options.Template != "" {
+				panic("cannot specify both --template and jobs.yaml")
+			}
+			template := AsMap(template)
+			options.Template = template["command"].(string)
+			options.Range = AsString(template["range"])
+		}
 
-		for k, v := range jobs {
-			job := jobdesc{name: k, command: v.(string)}
-			queue.Add(job)
+		if jobs, found := yjobs["jobs"]; found {
+			jobs := AsMap(jobs)
+			for k, v := range jobs {
+				job := jobdesc{name: k, command: v.(string)}
+				queue.Add(job)
+			}
 		}
 	}
 
