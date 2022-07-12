@@ -257,6 +257,10 @@ func main() {
 			Execute(pre.(string))
 		}
 
+		if logdir, found := yjobs["logdir"]; found && options.LogDir == "" {
+			options.LogDir = logdir.(string)
+		}
+
 		if template, found := yjobs["template"]; found {
 			if options.Template != "" {
 				panic("cannot specify both --template and jobs.yaml")
