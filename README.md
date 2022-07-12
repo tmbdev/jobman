@@ -32,29 +32,37 @@ jobs:
 Now you can run your jobs with:
 
 ```Bash
-$ jobman jobs.yaml -o logs
+$ jobman -j jobs.yaml -o logs
 ```
 
 Jobman will execute your jobs on all the different runners and place the log
 files in the logs subdirectory.
 
+You can also just specify jobs from the command line. This will run 100 jobs
+with seed 0..99:
+
+```Bash
+$ jobman -T 'python3 train.py --seed={i}' -R 100 -o logs
+```
+
+
 Usage:
 
 ```
 Usage:
-  jobman [OPTIONS] Jobs
+  jobman [OPTIONS]
 
 Application Options:
   -v, --verbose       Verbose output
-  -w, --wait=         Wait time after each job.
+  -w, --wait=         Wait after each job completion.
   -r, --runners=      Runners file (default: env JOBMAN_RUNNERS or runners.yaml)
   -l, --line-buffer=  Line buffer size. (default: 1)
   -t, --line-timeout= Line timeout. (default: 1)
   -o, --log-dir=      Log directory.
+  -j, --jobs=         Jobs file
+  -T, --template=     Command template
+  -R, --range=        Range used with command template.
 
 Help Options:
   -h, --help          Show this help message
-
-Arguments:
-  Jobs:               Jobs file
 ```
