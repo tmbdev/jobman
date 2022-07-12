@@ -95,6 +95,13 @@ type jobdesc struct {
 	command string
 }
 
+func Execute(script string) {
+	cmd := exec.Command("/bin/bash", "-c", script)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Run()
+}
+
 func Runner(name string, cmd []string, queue *fifo.Queue) {
 	if options.Verbose {
 		fmt.Printf("runner: %q :: %q\n", name, cmd)
@@ -118,16 +125,17 @@ func Runner(name string, cmd []string, queue *fifo.Queue) {
 			if err != nil {
 				fmt.Printf("# failed to create log file: %s\n", logfile)
 			}
-			defer stream.Close()
 			cmd.Stdout = stream 
 			cmd.Stderr = stream
+			cmd.Run()
+			stream.Close()
 		} else {
 			stream := LinewiseOutput(ident, true)
-			defer stream.Close()
 			cmd.Stdout = stream 
 			cmd.Stderr = stream
+			cmd.Run()
+			stream.Close()
 		}
-		cmd.Run()
 		time.Sleep(1 * time.Second)
 	}
 }
@@ -149,7 +157,7 @@ func AsCommand(args interface{}) []string {
 	case []string:
 		return args
 	default:
-		panic("bad syntax")
+		panic(fmt.Sprintf("AsCommand: bad type: %T", args))
 	}
 }
 
@@ -157,6 +165,12 @@ func AsMap(args interface{}) map[string]interface{} {
 	switch args.(type) {
 	case map[string]interface{}:
 		return args.(map[string]interface{})
+	case map[interface{}]interface{}:
+		m := map[string]interface{}{}
+		for k, v := range args.(map[interface{}]interface{}) {
+			m[k.(string)] = v
+		}
+		return m
 	case []interface{}:
 		m := map[string]interface{}{}
 		for i, v := range args.([]interface{}) {
@@ -164,7 +178,7 @@ func AsMap(args interface{}) map[string]interface{} {
 		}
 		return m
 	default:
-		return map[string]interface{}{}
+		panic(fmt.Sprintf("AsMap: bad type: %T: %q", args, args))
 	}
 }
 
@@ -207,6 +221,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	if pre, found := yrunners["pre"]; found {
+		Execute(pre.(string))
+	}
+
 	queue := fifo.NewQueue()
 
 	if options.Jobs != "" {
@@ -216,14 +234,17 @@ func main() {
 			os.Exit(1)
 		}
 
-		jobs := AsMap(yjobs)
+		if pre, found := yjobs["pre"]; found {
+			Execute(pre.(string))
+		}
+
+		jobs := AsMap(yjobs["jobs"])
 
 		for k, v := range jobs {
 			job := jobdesc{name: k, command: v.(string)}
 			queue.Add(job)
 		}
 	}
-
 
 	if options.Template != "" {
 		if options.Range == "" {
@@ -240,7 +261,6 @@ func main() {
 			os.Exit(1)
 		}
 	}
-
 
 	if queue.Len() == 0 {
 		fmt.Println("no jobs to run")

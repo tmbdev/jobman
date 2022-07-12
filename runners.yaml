@@ -1,3 +1,5 @@
+pre: |
+  echo startup: test runners
 runners:
   host1: ["/bin/bash", "-c", "{cmd}"]
   host2: "/bin/bash -c {cmd}"

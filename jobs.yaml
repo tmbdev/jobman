@@ -1,9 +1,11 @@
+pre: |
+  echo startup: test jobs
 jobs:
-  - for i in {1..10}; do echo job=$$ result=$i; echo job=$$ more=$i; sleep 3; done
-  - for i in {1..10}; do echo job=$$ result=$i; echo job=$$ more=$i; sleep 3; done
-  - for i in {1..10}; do echo job=$$ result=$i; echo job=$$ more=$i; sleep 3; done
-  - for i in {1..10}; do echo job=$$ result=$i; echo job=$$ more=$i; sleep 3; done
-  - for i in {1..10}; do echo job=$$ result=$i; echo job=$$ more=$i; sleep 3; done
-  - for i in {1..10}; do echo job=$$ result=$i; echo job=$$ more=$i; sleep 3; done
-  - for i in {1..10}; do echo job=$$ result=$i; echo job=$$ more=$i; sleep 3; done
-  - for i in {1..10}; do echo job=$$ result=$i; echo job=$$ more=$i; sleep 3; done
+  - for i in {1..3}; do echo job=$$ result=$i; echo job=$$ more=$i; sleep 1; done
+  - for i in {1..3}; do echo job=$$ result=$i; echo job=$$ more=$i; sleep 1; done
+  - for i in {1..3}; do echo job=$$ result=$i; echo job=$$ more=$i; sleep 1; done
+  - for i in {1..3}; do echo job=$$ result=$i; echo job=$$ more=$i; sleep 1; done
+  - for i in {1..3}; do echo job=$$ result=$i; echo job=$$ more=$i; sleep 1; done
+  - for i in {1..3}; do echo job=$$ result=$i; echo job=$$ more=$i; sleep 1; done
+  - for i in {1..3}; do echo job=$$ result=$i; echo job=$$ more=$i; sleep 1; done
+  - for i in {1..3}; do echo job=$$ result=$i; echo job=$$ more=$i; sleep 3; done
