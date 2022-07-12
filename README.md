@@ -66,3 +66,11 @@ Application Options:
 Help Options:
   -h, --help          Show this help message
 ```
+
+# TODO
+
+- override some command line options from jobs file
+- add `pre:` and `post:` section to both runners and jobs
+- add error handling options and retry options
+- allow non-shell, list-based invocation of commands
+- allow templating and multiline scripts inside jobs
