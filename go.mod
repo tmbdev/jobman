@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/foize/go.fifo v0.0.0-20130327144150-3a04cfeec121
 	github.com/jessevdk/go-flags v1.5.0
+	github.com/mattn/go-shellwords v1.0.12
 	gopkg.in/yaml.v3 v3.0.1
 )
 

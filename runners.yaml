@@ -1,5 +1,3 @@
 runners:
-  host1: /bin/bash -c '{cmd}'
-  host2: /bin/bash -c '{cmd}'
-  host3: /bin/bash -c '{cmd}'
-  host4: /bin/bash -c '{cmd}'
+  host1: ["/bin/bash", "-c", "{cmd}"]
+  host2: "/bin/bash -c {cmd}"

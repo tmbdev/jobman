@@ -15,6 +15,7 @@ import (
 	"sync"
 	"github.com/foize/go.fifo"
 	"gopkg.in/yaml.v3"
+	"github.com/mattn/go-shellwords"
 )
 
 var options struct {
@@ -94,9 +95,9 @@ type jobdesc struct {
 	command string
 }
 
-func Runner(name string, cmd string, queue *fifo.Queue) {
+func Runner(name string, cmd []string, queue *fifo.Queue) {
 	if options.Verbose {
-		fmt.Printf("runner: %s :: %s\n", name, cmd)
+		fmt.Printf("runner: %q :: %q\n", name, cmd)
 	}
 	for {
 		item := queue.Next()
@@ -104,10 +105,13 @@ func Runner(name string, cmd string, queue *fifo.Queue) {
 			break
 		}
 		job := item.(jobdesc)
-		actual := strings.Replace(cmd, "{cmd}", job.command, -1)
+		actual := make([]string, len(cmd))
+		for i, v := range cmd {
+			actual[i] = strings.Replace(v, "{name}", job.name, -1)
+			actual[i] = strings.Replace(actual[i], "{cmd}", job.command, -1)	
+		}
 		ident := fmt.Sprintf("%s@%s", job.name, name)
-		fmt.Printf("# starting: %s :: %s\n", ident, actual)
-		cmd := exec.Command("/bin/sh", "-c", actual)
+		cmd := exec.Command(actual[0], actual[1:]...)
 		if options.LogDir != "" {
 			logfile := fmt.Sprintf("%s/%s_%010d.log", options.LogDir, ident, time.Now().Unix())
 			stream, err := os.Create(logfile)
@@ -127,6 +131,43 @@ func Runner(name string, cmd string, queue *fifo.Queue) {
 		time.Sleep(1 * time.Second)
 	}
 }
+
+func AsCommand(args interface{}) []string {
+	switch args := args.(type) {
+	case string:
+		words, err := shellwords.Parse(args)
+		if err != nil {
+			panic(err)
+		}
+		return words
+	case []interface{}:
+		cmd := make([]string, len(args))
+		for i, v := range args {
+			cmd[i] = v.(string)
+		}
+		return cmd
+	case []string:
+		return args
+	default:
+		panic("bad syntax")
+	}
+}
+
+func AsMap(args interface{}) map[string]interface{} {
+	switch args.(type) {
+	case map[string]interface{}:
+		return args.(map[string]interface{})
+	case []interface{}:
+		m := map[string]interface{}{}
+		for i, v := range args.([]interface{}) {
+			m[fmt.Sprintf("%d", i)] = v
+		}
+		return m
+	default:
+		return map[string]interface{}{}
+	}
+}
+
 
 func ReadYaml(file string) (map[interface{}]interface{}, error) {
 	text, err := ioutil.ReadFile(file)
@@ -175,20 +216,11 @@ func main() {
 			os.Exit(1)
 		}
 
-		switch jobs := yjobs["jobs"].(type) {
-		case []interface{}:
-			for k, v := range jobs {
-				job := jobdesc{name: strconv.Itoa(k), command: v.(string)}
-				queue.Add(job)
-			}
-		case map[string]interface{}:
-			for k, v := range jobs {
-				job := jobdesc{name: k, command: v.(string)}
-				queue.Add(job)
-			}
-		default:
-			fmt.Println("jobs is not a list or map")
-			os.Exit(1)
+		jobs := AsMap(yjobs)
+
+		for k, v := range jobs {
+			job := jobdesc{name: k, command: v.(string)}
+			queue.Add(job)
 		}
 	}
 
@@ -217,27 +249,15 @@ func main() {
 
 
 	wg := sync.WaitGroup{}
-	switch runners := yrunners["runners"].(type) {
-	case []interface{}:
-		for k, v := range runners {
-			wg.Add(1)
-			go func(k int, v string) {
-				Runner(strconv.Itoa(k), v, queue)
-				wg.Done()
-			} (k, v.(string))
-		}
-	case map[string]interface{}:
-		for k, v := range runners {
-			wg.Add(1)
-			go func(k string, v string) {
-				Runner(k, v, queue)
-				wg.Done()
-			} (k, v.(string))
-		}
-	default:
-		fmt.Println("runners is not a list or map")
-		os.Exit(1)
+	runners := AsMap(yrunners["runners"])
+	for k, v := range runners {
+		wg.Add(1)
+		go func(k string, v []string) {
+			Runner(k, v, queue)
+			wg.Done()
+		} (k, AsCommand(v))
 	}
+
 	wg.Wait()
 	fmt.Println("done")
 }
