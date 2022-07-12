@@ -25,6 +25,7 @@ var options struct {
 	LineBuffer int `short:"l" long:"line-buffer" description:"Line buffer size." default:"1"`
 	LineTimeout float32 `short:"t" long:"line-timeout" description:"Line timeout." default:"1"`
 	LogDir string `short:"o" long:"log-dir" description:"Log directory." default:""`
+	OnInput bool `long:"on-input" description:"Run jobs on input."`
 	Jobs string `short:"j" long:"jobs" description:"Jobs file" default:""`
 	Template string `short:"T" long:"template" description:"Command template" default:""`
 	Range string `short:"R" long:"range" description:"Range used with command template." default:""`
@@ -102,7 +103,7 @@ func Execute(script string) {
 	cmd.Run()
 }
 
-func Runner(name string, cmd []string, queue *fifo.Queue) {
+func Runner(name string, cmd []string, queue *fifo.Queue, oninput bool) {
 	if options.Verbose {
 		fmt.Printf("runner: %q :: %q\n", name, cmd)
 	}
@@ -119,6 +120,12 @@ func Runner(name string, cmd []string, queue *fifo.Queue) {
 		}
 		ident := fmt.Sprintf("%s@%s", job.name, name)
 		cmd := exec.Command(actual[0], actual[1:]...)
+		if oninput {
+			cmd.Stdin = strings.NewReader(job.command)
+			fmt.Printf("[%s] %q <<< %q\n", ident, actual, job.command)
+		}  else {
+			fmt.Printf("[%s] %q\n", ident, actual)
+		}
 		if options.LogDir != "" {
 			logfile := fmt.Sprintf("%s/%s_%010d.log", options.LogDir, ident, time.Now().Unix())
 			stream, err := os.Create(logfile)
@@ -209,6 +216,7 @@ func ReadYaml(file string) (map[interface{}]interface{}, error) {
 
 func main() {
 	if _, err := Parser.Parse(); err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
 
@@ -267,6 +275,8 @@ func main() {
 		}
 	}
 
+	fmt.Printf("# %d jobs\n", queue.Len())
+
 	if options.Template != "" {
 		if options.Range == "" {
 			job := jobdesc{name: "job", command: options.Template}
@@ -290,11 +300,14 @@ func main() {
 
 
 	wg := sync.WaitGroup{}
+	if oninput, found := yrunners["oninput"]; found {
+		options.OnInput = oninput.(bool)
+	}
 	runners := AsMap(yrunners["runners"])
 	for k, v := range runners {
 		wg.Add(1)
 		go func(k string, v []string) {
-			Runner(k, v, queue)
+			Runner(k, v, queue, options.OnInput)
 			wg.Done()
 		} (k, AsCommand(v))
 	}

@@ -74,3 +74,6 @@ Help Options:
 - add error handling options and retry options
 - allow non-shell, list-based invocation of commands
 - allow templating and multiline scripts inside jobs
+- command on stdin
+- jsonrun
+- job specs -- input, output, commandline, time limit, resource limit
