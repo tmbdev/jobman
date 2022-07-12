@@ -18,6 +18,18 @@ runners:
   odin1: ssh odin podman run -e NVIDIA_VISIBLE_DEVICES=1 registry:5000/pytorch-img {cmd}
 ```
 
+You actually probably want the script/command on stdin:
+
+```YAML
+pre: echo running on the valhalla cluster
+oninput: true
+runners:
+  thor0: ssh thor podman run -e NVIDIA_VISIBLE_DEVICES=0 registry:5000/pytorch-img /bin/bash
+  thor1: ssh thor podman run -e NVIDIA_VISIBLE_DEVICES=1 registry:5000/pytorch-img /bin/bash
+  odin0: ssh odin podman run -e NVIDIA_VISIBLE_DEVICES=0 registry:5000/pytorch-img /bin/bash
+  odin1: ssh odin podman run -e NVIDIA_VISIBLE_DEVICES=1 registry:5000/pytorch-img /bin/bash
+```
+
 You specify jobs like this:
 
 ```YAML
@@ -27,6 +39,16 @@ jobs:
   - python3 train.py --seed 2
   ...
   - python3 train.py --seed 100
+```
+
+Or like this:
+
+```YAML
+pre: |
+  echo startup: test jobs
+template:
+  command: echo {i}
+  range: 10
 ```
 
 Now you can run your jobs with:
