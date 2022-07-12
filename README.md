@@ -46,6 +46,8 @@ Or like this:
 ```YAML
 pre: |
   echo startup: test jobs
+  rm -rf /tmp/mylogs
+logdir: /tmp/mylogs
 template:
   command: echo {i}
   range: 10
