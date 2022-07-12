@@ -126,7 +126,7 @@ func Runner(name string, cmd []string, queue *fifo.Queue, oninput bool) {
 		}  else {
 			fmt.Printf("[%s] %q\n", ident, actual)
 		}
-		if options.LogDir != "" {
+		if options.LogDir != "-" && options.LogDir != "" {
 			logfile := fmt.Sprintf("%s/%s_%010d.log", options.LogDir, ident, time.Now().Unix())
 			stream, err := os.Create(logfile)
 			if err != nil {
@@ -220,13 +220,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if options.LogDir != "" {
-		err := os.MkdirAll(options.LogDir, 0755)
-		if err != nil {
-			fmt.Printf("# failed to create log directory: %s\n", options.LogDir)
-		}
-	}
-
 	if options.Runners == "" {
 		options.Runners = os.Getenv("JOBMAN_RUNNERS")
 		if options.Runners == "" {
@@ -307,6 +300,13 @@ func main() {
 
 	if jobs_pre != "" {
 		Execute(jobs_pre)
+	}
+
+	if options.LogDir != "" && options.LogDir != "-" {
+		err := os.MkdirAll(options.LogDir, 0755)
+		if err != nil {
+			fmt.Printf("# failed to create log directory: %s\n", options.LogDir)
+		}
 	}
 
 	wg := sync.WaitGroup{}
