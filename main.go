@@ -1,34 +1,35 @@
 package main
 
 import (
-	"io"
-	"errors"
 	"bufio"
-	"os"
+	"errors"
 	"fmt"
-	"time"
+	"io"
+	"io/ioutil"
+	"os"
 	"os/exec"
 	"strconv"
-	"github.com/jessevdk/go-flags"
-	"io/ioutil"
 	"strings"
 	"sync"
-	"github.com/foize/go.fifo"
-	"gopkg.in/yaml.v3"
+	"time"
+
+	fifo "github.com/foize/go.fifo"
+	"github.com/jessevdk/go-flags"
 	"github.com/mattn/go-shellwords"
+	"gopkg.in/yaml.v3"
 )
 
 var options struct {
-	Verbose bool `short:"v" long:"verbose" description:"Verbose output"`
-	Wait int `short:"w" long:"wait" description:"Wait after each job completion."`
-	Runners string `short:"r" long:"runners" description:"Runners file (default: env JOBMAN_RUNNERS or runners.yaml)" default:""`
-	LineBuffer int `short:"l" long:"line-buffer" description:"Line buffer size." default:"1"`
+	Verbose     bool    `short:"v" long:"verbose" description:"Verbose output"`
+	Wait        int     `short:"w" long:"wait" description:"Wait after each job completion."`
+	Runners     string  `short:"r" long:"runners" description:"Runners file (default: env JOBMAN_RUNNERS or runners.yaml)" default:""`
+	LineBuffer  int     `short:"l" long:"line-buffer" description:"Line buffer size." default:"1"`
 	LineTimeout float32 `short:"t" long:"line-timeout" description:"Line timeout." default:"1"`
-	LogDir string `short:"o" long:"log-dir" description:"Log directory." default:""`
-	OnInput bool `long:"on-input" description:"Run jobs on input."`
-	Jobs string `short:"j" long:"jobs" description:"Jobs file" default:""`
-	Template string `short:"T" long:"template" description:"Command template" default:""`
-	Range string `short:"R" long:"range" description:"Range used with command template." default:""`
+	LogDir      string  `short:"o" long:"log-dir" description:"Log directory." default:""`
+	OnInput     bool    `long:"on-input" description:"Run jobs on input."`
+	Jobs        string  `short:"j" long:"jobs" description:"Jobs file" default:""`
+	Template    string  `short:"T" long:"template" description:"Command template" default:""`
+	Range       string  `short:"R" long:"range" description:"Range used with command template." default:""`
 }
 
 var Parser = flags.NewParser(&options, flags.Default)
@@ -67,7 +68,7 @@ func LinewiseOutput(prefix string, eofnotify bool) *io.PipeWriter {
 		lines := []string{}
 		last := time.Now()
 		for {
-			line, err := ReadLineWithTimeout(buffered_reader, 1 * time.Second)
+			line, err := ReadLineWithTimeout(buffered_reader, 1*time.Second)
 			if err != TIMEOUT {
 				if err != nil {
 					break
@@ -87,12 +88,12 @@ func LinewiseOutput(prefix string, eofnotify bool) *io.PipeWriter {
 		if eofnotify {
 			fmt.Println(prefix, "---")
 		}
-	} ()
+	}()
 	return writer
 }
 
 type jobdesc struct {
-	name string
+	name    string
 	command string
 }
 
@@ -116,14 +117,14 @@ func Runner(name string, cmd []string, queue *fifo.Queue, oninput bool) {
 		actual := make([]string, len(cmd))
 		for i, v := range cmd {
 			actual[i] = strings.Replace(v, "{name}", job.name, -1)
-			actual[i] = strings.Replace(actual[i], "{cmd}", job.command, -1)	
+			actual[i] = strings.Replace(actual[i], "{cmd}", job.command, -1)
 		}
 		ident := fmt.Sprintf("%s@%s", job.name, name)
 		cmd := exec.Command(actual[0], actual[1:]...)
 		if oninput {
 			cmd.Stdin = strings.NewReader(job.command)
 			fmt.Printf("[%s] %q <<< %q\n", ident, actual, job.command)
-		}  else {
+		} else {
 			fmt.Printf("[%s] %q\n", ident, actual)
 		}
 		if options.LogDir != "-" && options.LogDir != "" {
@@ -132,13 +133,13 @@ func Runner(name string, cmd []string, queue *fifo.Queue, oninput bool) {
 			if err != nil {
 				fmt.Printf("# failed to create log file: %s\n", logfile)
 			}
-			cmd.Stdout = stream 
+			cmd.Stdout = stream
 			cmd.Stderr = stream
 			cmd.Run()
 			stream.Close()
 		} else {
 			stream := LinewiseOutput(ident, true)
-			cmd.Stdout = stream 
+			cmd.Stdout = stream
 			cmd.Stderr = stream
 			cmd.Run()
 			stream.Close()
@@ -200,7 +201,6 @@ func AsMap(args interface{}) map[string]interface{} {
 	}
 }
 
-
 func ReadYaml(file string) (map[interface{}]interface{}, error) {
 	text, err := ioutil.ReadFile(file)
 	if err != nil {
@@ -214,6 +214,11 @@ func ReadYaml(file string) (map[interface{}]interface{}, error) {
 	return data, nil
 }
 
+func FileExists(file string) bool {
+	_, err := os.Stat(file)
+	return err == nil
+}
+
 func main() {
 	if _, err := Parser.Parse(); err != nil {
 		fmt.Println(err)
@@ -222,15 +227,24 @@ func main() {
 
 	if options.Runners == "" {
 		options.Runners = os.Getenv("JOBMAN_RUNNERS")
-		if options.Runners == "" {
+		if options.Runners == "" && FileExists("runners.yaml") {
 			options.Runners = "runners.yaml"
 		}
 	}
 
-	yrunners, err := ReadYaml(options.Runners)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+	yrunners := make(map[interface{}]interface{})
+	if options.Runners != "" {
+		y, err := ReadYaml(options.Runners)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		yrunners = y
+	} else {
+		fmt.Println("no runners.yaml specified/found, using one 'sh' job")
+		l := map[interface{}]interface{}{"sh": "sh"}
+		yrunners = map[interface{}]interface{}{"runners": l}
+		options.OnInput = true
 	}
 
 	if pre, found := yrunners["pre"]; found {
@@ -319,7 +333,7 @@ func main() {
 		go func(k string, v []string) {
 			Runner(k, v, queue, options.OnInput)
 			wg.Done()
-		} (k, AsCommand(v))
+		}(k, AsCommand(v))
 	}
 
 	wg.Wait()
